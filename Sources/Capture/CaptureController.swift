@@ -8,7 +8,7 @@ final class CaptureController: ObservableObject {
     private var session: ARSession?
     private let ciContext = CIContext()
 
-    static var isSupported: Bool {
+    nonisolated static var isSupported: Bool {
         ARWorldTrackingConfiguration.isSupported
             && ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth)
     }
