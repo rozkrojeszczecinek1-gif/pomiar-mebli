@@ -1,0 +1,32 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        run: xcodegen generate
+      - name: Available simulators
+        run: xcrun simctl list devices available | head -30
+      - name: Test
+        run: |
+          xcodebuild test -project PomiarMebli.xcodeproj -scheme PomiarMebli \
+            -destination 'platform=iOS Simulator,name=iPhone 16' -quiet
+      - name: Build unsigned IPA
+        run: |
+          xcodebuild build -project PomiarMebli.xcodeproj -scheme PomiarMebli \
+            -configuration Release -sdk iphoneos -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" -quiet
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/PomiarMebli.app Payload/
+          zip -qr PomiarMebli.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PomiarMebli-ipa
+          path: PomiarMebli.ipa
