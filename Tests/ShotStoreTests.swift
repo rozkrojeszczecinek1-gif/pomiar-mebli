@@ -45,7 +45,8 @@ final class ShotStoreTests: XCTestCase {
     }
 
     func testUpdatePersistsMeasurements() throws {
-        var meta = try store.save(shot(), name: "X", now: Date())
+        // pełne sekundy: ISO8601 w meta.json nie zachowuje ułamków
+        var meta = try store.save(shot(), name: "X", now: Date(timeIntervalSince1970: 1_000))
         meta.measurements.append(Measurement(a: NormalizedPoint(x: 0.1, y: 0.2), b: NormalizedPoint(x: 0.9, y: 0.8)))
         meta.name = "Nowa nazwa"
         try store.update(meta)

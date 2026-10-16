@@ -49,7 +49,11 @@ final class GeometryTests: XCTestCase {
 
     func testLayoutFitsAndCenters() {
         let l = ImageLayout(container: CGSize(width: 400, height: 800), displayed: CGSize(width: 300, height: 400))
-        XCTAssertEqual(l.rect, CGRect(x: 0, y: 100, width: 400, height: 600))
+        // skala = min(400/300, 800/400) = 4/3 -> 400 x 533.33, wyśrodkowane w pionie
+        XCTAssertEqual(l.rect.minX, 0, accuracy: 1e-9)
+        XCTAssertEqual(l.rect.minY, 400.0 / 3.0, accuracy: 1e-9)
+        XCTAssertEqual(l.rect.width, 400, accuracy: 1e-9)
+        XCTAssertEqual(l.rect.height, 1600.0 / 3.0, accuracy: 1e-9)
         let v = l.viewPoint(p(0.5, 0.5))
         XCTAssertEqual(v.x, 200, accuracy: 1e-9)
         XCTAssertEqual(v.y, 400, accuracy: 1e-9)
