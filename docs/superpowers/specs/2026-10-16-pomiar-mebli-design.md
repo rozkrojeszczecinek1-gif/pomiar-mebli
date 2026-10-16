@@ -52,7 +52,8 @@ nie jest potrzebna, bo oba punkty należą do jednej klatki):
 - odległość = norma euklidesowa różnicy dwóch punktów 3D.
 
 Wiarygodność (progi do strojenia po testach w terenie): zielona gdy ≥ 60% pikseli
-okna ważnych i rozrzut (MAD) < 1,5% głębi; poza zakresem 0,3–5 m — ostrzeżenie.
+okna ważnych i ≥ 80% ważnych pikseli mieści się w ±2% mediany (odporne na krawędzie
+między planami); poza zakresem 0,3–5 m — żółta.
 Znane słabości LiDAR: szkło, połyski, czarne powierzchnie, krawędzie (głębia
 „rozmywa się" między planami) — stąd mediana, filtr pewności i kolor wiarygodności.
 
