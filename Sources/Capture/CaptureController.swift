@@ -29,11 +29,11 @@ final class CaptureController: ObservableObject {
     }
 
     func setZoom(_ factor: CGFloat) {
-        guard let device = AVCaptureDevice.default(.builtInLiDARDepthCamera, for: .video, position: .back) else { return }
+        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else { return }
         do {
             try device.lockForConfiguration()
             let clamped = max(device.minAvailableVideoZoomFactor,
-                              min(factor, device.activeFormat.videoMaxZoomFactor))
+                              min(factor, min(device.activeFormat.videoMaxZoomFactor, 5.0)))
             device.videoZoomFactor = clamped
             device.unlockForConfiguration()
         } catch {}

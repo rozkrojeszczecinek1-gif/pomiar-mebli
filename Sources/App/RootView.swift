@@ -2,35 +2,60 @@ import SwiftUI
 import RoomPlan
 
 struct RootView: View {
-    let store: ShotStore
+    @StateObject private var projectStore = ProjectStore()
+    @State private var selectedProject: ProjectMeta?
     @State private var path: [UUID] = []
     @State private var showCapture = false
     @State private var showRoomScan = false
     @State private var roomScanData: CapturedRoomData?
 
-    init(store: ShotStore = ShotStore(root: ShotStore.defaultRoot())) {
-        self.store = store
+    private var shotStore: ShotStore? {
+        selectedProject.map { projectStore.shotStore(for: $0) }
     }
 
     var body: some View {
         NavigationStack(path: $path) {
-            GalleryView(
-                store: store,
-                onNew: { showCapture = true },
-                onOpen: { path.append($0) },
-                onRoomScan: { showRoomScan = true }
-            )
-            .navigationDestination(for: UUID.self) { ShotScreen(store: store, id: $0) }
+            if let project = selectedProject, let store = shotStore {
+                GalleryView(
+                    store: store,
+                    projectName: project.name,
+                    onNew: { showCapture = true },
+                    onOpen: { path.append($0) },
+                    onRoomScan: { showRoomScan = true }
+                )
+                .navigationDestination(for: UUID.self) { ShotScreen(store: store, id: $0) }
+                .navigationBarBackButtonHidden(true)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            path = []
+                            selectedProject = nil
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "chevron.left")
+                                Text("Projekty")
+                            }
+                        }
+                    }
+                }
+            } else {
+                ProjectListView(store: projectStore, onSelect: { project in
+                    selectedProject = project
+                    path = []
+                })
+            }
         }
         .fullScreenCover(isPresented: $showCapture) {
-            CaptureView(onCancel: { showCapture = false }, onCaptured: { shot in
-                showCapture = false
-                let f = DateFormatter()
-                f.locale = Locale(identifier: "pl_PL"); f.dateFormat = "yyyy-MM-dd HH:mm"
-                if let meta = try? store.save(shot, name: "Pomiar \(f.string(from: Date()))") {
-                    path.append(meta.id)
-                }
-            })
+            if let store = shotStore {
+                CaptureView(onCancel: { showCapture = false }, onCaptured: { shot in
+                    showCapture = false
+                    let f = DateFormatter()
+                    f.locale = Locale(identifier: "pl_PL"); f.dateFormat = "yyyy-MM-dd HH:mm"
+                    if let meta = try? store.save(shot, name: "Pomiar \(f.string(from: Date()))") {
+                        path.append(meta.id)
+                    }
+                })
+            }
         }
         .fullScreenCover(isPresented: $showRoomScan) {
             if let data = roomScanData {

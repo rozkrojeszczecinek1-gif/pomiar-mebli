@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GalleryView: View {
     let store: ShotStore
+    let projectName: String
     let onNew: () -> Void
     let onOpen: (UUID) -> Void
     let onRoomScan: () -> Void
@@ -25,7 +26,7 @@ struct GalleryView: View {
                 }
             }.padding()
         }
-        .navigationTitle("R2D2 Pomiar")
+        .navigationTitle(projectName)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button(action: onRoomScan) {
