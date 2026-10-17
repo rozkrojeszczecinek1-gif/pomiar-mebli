@@ -126,7 +126,6 @@ final class ARLiveMeasureVM: NSObject, ObservableObject {
         // Priority order: plane geometry → plane raycast → estimated plane → feature point
         let hits = view.hitTest(screenPoint, types: [
             .existingPlaneUsingGeometry,
-            .existingPlaneUsingRaycast,
             .estimatedVerticalPlane,
             .estimatedHorizontalPlane,
             .featurePoint

@@ -56,7 +56,7 @@ final class CaptureController: NSObject, ObservableObject {
 
     private func applyZoom(_ factor: CGFloat) {
         guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else { return }
-        guard (try? device.lockForConfiguration()) != nil else { return }
+        do { try device.lockForConfiguration() } catch { return }
         defer { device.unlockForConfiguration() }
         let maxF = min(device.activeFormat.videoMaxZoomFactor, 5.0)
         device.videoZoomFactor = min(max(factor, device.minAvailableVideoZoomFactor), maxF)
