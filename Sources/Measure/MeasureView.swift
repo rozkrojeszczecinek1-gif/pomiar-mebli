@@ -8,10 +8,17 @@ struct MeasureView: View {
     private enum Drag { case move(DragTarget), place }
     @State private var drag: Drag?
     @State private var touch: CGPoint?
-    @State private var name = ""
+    @State private var name: String
 
     private var orientation: ImageOrientation { viewModel.meta.orientation }
     private let hitRadius: CGFloat = 28
+
+    init(viewModel: MeasureViewModel, image: UIImage, onShare: @escaping () -> Void) {
+        self.viewModel = viewModel
+        self.image = image
+        self.onShare = onShare
+        self._name = State(initialValue: viewModel.meta.name)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -45,7 +52,11 @@ struct MeasureView: View {
                     .disabled(viewModel.meta.measurements.isEmpty)
             }
         }
-        .onAppear { name = viewModel.meta.name }
+        .alert("Nie można zapisać pomiarów", isPresented: $viewModel.saveError) {
+            Button("OK") { viewModel.saveError = false }
+        } message: {
+            Text("Sprawdź dostępne miejsce na dysku.")
+        }
     }
 
     // MARK: gesty

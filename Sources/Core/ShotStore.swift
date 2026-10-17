@@ -10,7 +10,8 @@ final class ShotStore {
     }
 
     static func defaultRoot() -> URL {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        (FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory)
             .appendingPathComponent("Shots", isDirectory: true)
     }
 

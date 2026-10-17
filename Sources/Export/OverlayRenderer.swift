@@ -1,3 +1,4 @@
+import SwiftUI
 import UIKit
 
 struct OverlayLine: Equatable {
@@ -49,11 +50,7 @@ enum OverlayRenderer {
     }
 
     private static func uiColor(_ r: Reliability) -> UIColor {
-        switch r {
-        case .green: return UIColor(red: 0.1, green: 0.7, blue: 0.2, alpha: 1)
-        case .yellow: return UIColor.orange
-        case .red: return UIColor.red
-        }
+        UIColor(r.color)
     }
 
     private static func drawPill(_ text: String, at center: CGPoint, font: UIFont, in g: CGContext) {

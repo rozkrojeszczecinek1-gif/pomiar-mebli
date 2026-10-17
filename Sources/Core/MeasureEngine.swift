@@ -68,6 +68,7 @@ enum MeasureEngine {
 
     private static func window(_ m: DepthMap, _ cx: Int, _ cy: Int, radius r: Int)
         -> (values: [Float], total: Int) {
+        guard m.width > 0, m.height > 0 else { return ([], 0) }
         var out: [Float] = []
         var total = 0
         for y in max(0, cy - r)...min(m.height - 1, cy + r) {

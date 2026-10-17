@@ -11,8 +11,10 @@ enum DragTarget: Equatable {
 final class MeasureViewModel: ObservableObject {
     @Published private(set) var meta: ShotMeta
     @Published private(set) var pendingA: NormalizedPoint?
+    @Published var saveError = false
     let depth: DepthMap
     private let store: ShotStore
+    private var resultsCache: [UUID: MeasurementResult] = [:]
 
     init(meta: ShotMeta, depth: DepthMap, store: ShotStore) {
         self.meta = meta
@@ -21,7 +23,10 @@ final class MeasureViewModel: ObservableObject {
     }
 
     func result(for m: Measurement) -> MeasurementResult {
-        MeasureEngine.measure(depth, meta.intrinsics, from: m.a, to: m.b)
+        if let cached = resultsCache[m.id] { return cached }
+        let r = MeasureEngine.measure(depth, meta.intrinsics, from: m.a, to: m.b)
+        resultsCache[m.id] = r
+        return r
     }
 
     func hit(at point: CGPoint, radius: CGFloat,
@@ -42,9 +47,14 @@ final class MeasureViewModel: ObservableObject {
 
     func move(_ target: DragTarget, to p: NormalizedPoint) {
         switch target {
-        case .pending: pendingA = p
-        case .a(let id): mutate(id) { $0.a = p }
-        case .b(let id): mutate(id) { $0.b = p }
+        case .pending:
+            pendingA = p
+        case .a(let id):
+            mutate(id) { $0.a = p }
+            resultsCache.removeValue(forKey: id)
+        case .b(let id):
+            mutate(id) { $0.b = p }
+            resultsCache.removeValue(forKey: id)
         }
     }
 
@@ -62,6 +72,7 @@ final class MeasureViewModel: ObservableObject {
 
     func delete(_ id: UUID) {
         meta.measurements.removeAll { $0.id == id }
+        resultsCache.removeValue(forKey: id)
         persist()
     }
 
@@ -77,5 +88,11 @@ final class MeasureViewModel: ObservableObject {
         change(&meta.measurements[i])
     }
 
-    private func persist() { try? store.update(meta) }
+    private func persist() {
+        do {
+            try store.update(meta)
+        } catch {
+            saveError = true
+        }
+    }
 }
