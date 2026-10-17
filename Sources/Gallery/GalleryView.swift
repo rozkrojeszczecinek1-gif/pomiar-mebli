@@ -6,6 +6,7 @@ struct GalleryView: View {
     let onNew: () -> Void
     let onOpen: (UUID) -> Void
     let onRoomScan: () -> Void
+    let onLiveMeasure: () -> Void
 
     @State private var shots: [ShotMeta] = []
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 12)]
@@ -29,8 +30,15 @@ struct GalleryView: View {
         .navigationTitle(projectName)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button(action: onRoomScan) {
-                    Label("Skanuj pokój", systemImage: "cube.transparent")
+                Menu {
+                    Button { onRoomScan() } label: {
+                        Label("Skanuj pokój 3D", systemImage: "cube.transparent")
+                    }
+                    Button { onLiveMeasure() } label: {
+                        Label("AR Pomiar na żywo", systemImage: "ruler")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {

@@ -7,6 +7,7 @@ struct RootView: View {
     @State private var path: [UUID] = []
     @State private var showCapture = false
     @State private var showRoomScan = false
+    @State private var showLiveMeasure = false
     @State private var roomScanData: CapturedRoomData?
 
     private var shotStore: ShotStore? {
@@ -21,7 +22,8 @@ struct RootView: View {
                     projectName: project.name,
                     onNew: { showCapture = true },
                     onOpen: { path.append($0) },
-                    onRoomScan: { showRoomScan = true }
+                    onRoomScan: { showRoomScan = true },
+                    onLiveMeasure: { showLiveMeasure = true }
                 )
                 .navigationDestination(for: UUID.self) { ShotScreen(store: store, id: $0) }
                 .navigationBarBackButtonHidden(true)
@@ -68,6 +70,13 @@ struct RootView: View {
                     onCancel: { showRoomScan = false },
                     onCompleted: { data in roomScanData = data }
                 )
+            }
+        }
+        .fullScreenCover(isPresented: $showLiveMeasure) {
+            if let store = shotStore, let project = selectedProject {
+                ARLiveMeasureView(store: store, projectName: project.name) {
+                    showLiveMeasure = false
+                }
             }
         }
     }
