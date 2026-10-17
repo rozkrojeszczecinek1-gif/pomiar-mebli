@@ -7,7 +7,9 @@ import UIKit
 @MainActor
 final class CaptureController: NSObject, ObservableObject {
     private var session: ARSession?
-    private let ciContext = CIContext()
+    // Use 16-bit wide color CIContext for maximum colour fidelity
+    private let ciContext = CIContext(options: [.workingColorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!,
+                                                .outputColorSpace:  CGColorSpace(name: CGColorSpace.displayP3)!])
     private var currentZoom: CGFloat = 1.0
 
     nonisolated static var isSupported: Bool {
@@ -20,13 +22,25 @@ final class CaptureController: NSObject, ObservableObject {
         self.session = session
         session.delegate = self
         UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+
         let config = ARWorldTrackingConfiguration()
+        // Pick highest-resolution format available (4K on iPhone 14 Pro Max)
+        config.videoFormat = Self.bestVideoFormat() ?? config.videoFormat
         config.frameSemantics = [.sceneDepth, .smoothedSceneDepth]
         config.planeDetection = [.horizontal, .vertical]
         if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
             config.sceneReconstruction = .mesh
         }
         session.run(config)
+    }
+
+    private static func bestVideoFormat() -> ARWorldTrackingConfiguration.VideoFormat? {
+        ARWorldTrackingConfiguration.supportedVideoFormats
+            .filter { ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) }
+            .max {
+                let a = $0.imageResolution; let b = $1.imageResolution
+                return (a.width * a.height) < (b.width * b.height)
+            }
     }
 
     func stop() {
@@ -42,7 +56,7 @@ final class CaptureController: NSObject, ObservableObject {
 
     private func applyZoom(_ factor: CGFloat) {
         guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else { return }
-        guard let _ = try? device.lockForConfiguration() else { return }
+        guard (try? device.lockForConfiguration()) != nil else { return }
         defer { device.unlockForConfiguration() }
         let maxF = min(device.activeFormat.videoMaxZoomFactor, 5.0)
         device.videoZoomFactor = min(max(factor, device.minAvailableVideoZoomFactor), maxF)
@@ -52,12 +66,25 @@ final class CaptureController: NSObject, ObservableObject {
         guard let frame = session?.currentFrame,
               let sceneDepth = frame.smoothedSceneDepth ?? frame.sceneDepth,
               let confidence = sceneDepth.confidenceMap,
-              let depth = DepthExtraction.depthMap(depth: sceneDepth.depthMap, confidence: confidence),
-              let jpeg = ciContext.jpegRepresentation(
-                of: CIImage(cvPixelBuffer: frame.capturedImage),
-                colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
-                options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 0.92])
+              let depth = DepthExtraction.depthMap(depth: sceneDepth.depthMap, confidence: confidence)
         else { return nil }
+
+        let ci = CIImage(cvPixelBuffer: frame.capturedImage)
+
+        // Prefer HEIF 16-bit (P3 wide colour) — closest to ProRAW we can get from ARKit
+        // ARKit gives YCbCr CVPixelBuffer; true ProRAW sensor data is not available from ARKit API
+        let imageData: Data?
+        let p3 = CGColorSpace(name: CGColorSpace.displayP3)!
+        if #available(iOS 15, *) {
+            imageData = ciContext.heifRepresentation(of: ci,
+                                                     format: .RGBAh,   // 16-bit half-precision
+                                                     colorSpace: p3,
+                                                     options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 1.0])
+        } else {
+            imageData = ciContext.jpegRepresentation(of: ci, colorSpace: p3,
+                                                     options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 0.99])
+        }
+        guard let data = imageData else { return nil }
 
         let k = frame.camera.intrinsics
         let res = frame.camera.imageResolution
@@ -65,13 +92,12 @@ final class CaptureController: NSObject, ObservableObject {
                                           cx: Double(k[2][0]), cy: Double(k[2][1]),
                                           imageWidth: Int(res.width), imageHeight: Int(res.height))
         let orientation = SensorGeometry.imageOrientation(for: UIDevice.current.orientation)
-        return CapturedShot(jpeg: jpeg, depth: depth, intrinsics: intrinsics, orientation: orientation)
+        return CapturedShot(jpeg: data, depth: depth, intrinsics: intrinsics, orientation: orientation)
     }
 }
 
 extension CaptureController: ARSessionDelegate {
     nonisolated func session(_ session: ARSession, didUpdate frame: ARFrame) {
-        // Re-apply zoom every 15 frames so ARKit can't reset it
         guard frame.timestamp.truncatingRemainder(dividingBy: 0.5) < 0.017 else { return }
         Task { @MainActor in
             if self.currentZoom > 1.01 { self.applyZoom(self.currentZoom) }

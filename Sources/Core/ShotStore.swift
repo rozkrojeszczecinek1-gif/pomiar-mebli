@@ -16,7 +16,15 @@ final class ShotStore {
     }
 
     private func dir(_ id: UUID) -> URL { root.appendingPathComponent(id.uuidString, isDirectory: true) }
-    func imageURL(for id: UUID) -> URL { dir(id).appendingPathComponent("foto.jpg") }
+
+    /// Returns the image URL, preferring .heic (new shots) with .jpg fallback (legacy shots).
+    func imageURL(for id: UUID) -> URL {
+        let heic = dir(id).appendingPathComponent("foto.heic")
+        if fm.fileExists(atPath: heic.path) { return heic }
+        return dir(id).appendingPathComponent("foto.jpg")
+    }
+
+    private func newImageURL(_ id: UUID) -> URL { dir(id).appendingPathComponent("foto.heic") }
     private func depthURL(_ id: UUID) -> URL { dir(id).appendingPathComponent("depth.bin") }
     private func metaURL(_ id: UUID) -> URL { dir(id).appendingPathComponent("meta.json") }
 
@@ -37,7 +45,7 @@ final class ShotStore {
                             depthWidth: shot.depth.width, depthHeight: shot.depth.height,
                             orientation: shot.orientation, measurements: [])
         try fm.createDirectory(at: dir(meta.id), withIntermediateDirectories: true)
-        try shot.jpeg.write(to: imageURL(for: meta.id), options: .atomic)
+        try shot.jpeg.write(to: newImageURL(meta.id), options: .atomic)
         try shot.depth.encoded().write(to: depthURL(meta.id), options: .atomic)
         try encoder.encode(meta).write(to: metaURL(meta.id), options: .atomic)
         return meta
