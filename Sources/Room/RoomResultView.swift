@@ -1,5 +1,6 @@
 import SwiftUI
 import RoomPlan
+import simd
 
 struct RoomResultView: View {
     let data: CapturedRoomData
@@ -134,14 +135,6 @@ struct RoomResultView: View {
             errorMsg = error.localizedDescription
         }
     }
-}
-
-private struct ShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-    func updateUIViewController(_ vc: UIActivityViewController, context: Context) {}
 }
 
 private extension CapturedRoom.Object.Category {
