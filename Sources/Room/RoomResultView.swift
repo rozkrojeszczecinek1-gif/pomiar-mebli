@@ -140,23 +140,21 @@ struct RoomResultView: View {
 private extension CapturedRoom.Object.Category {
     var label: String {
         switch self {
-        case .storage: return "Szafa/regał"
+        case .storage:      return "Szafa/regał"
         case .refrigerator: return "Lodówka"
-        case .stove: return "Kuchenka"
-        case .bed: return "Łóżko"
-        case .sink: return "Zlew/umywalka"
-        case .washer: return "Pralka"
-        case .toilet: return "Toaleta"
-        case .bathtub: return "Wanna"
-        case .oven: return "Piekarnik"
-        case .dishwasher: return "Zmywarka"
-        case .television: return "TV"
-        case .sofa: return "Sofa"
-        case .chair: return "Krzesło"
-        case .table: return "Stół"
-        case .stairs: return "Schody"
-        case .fireplace: return "Kominek"
-        @unknown default: return "Obiekt"
+        case .stove:        return "Kuchenka"
+        case .bed:          return "Łóżko"
+        case .sink:         return "Zlew/umywalka"
+        case .bathtub:      return "Wanna"
+        case .oven:         return "Piekarnik"
+        case .dishwasher:   return "Zmywarka"
+        case .television:   return "TV"
+        case .sofa:         return "Sofa"
+        case .chair:        return "Krzesło"
+        case .table:        return "Stół"
+        case .stairs:       return "Schody"
+        case .fireplace:    return "Kominek"
+        @unknown default:   return "Obiekt"
         }
     }
 }

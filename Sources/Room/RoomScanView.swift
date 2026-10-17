@@ -48,7 +48,7 @@ struct RoomScanView: View {
                 }
             }
         }
-        .onChange(of: coordinator.capturedData) { _, data in
+        .onReceive(coordinator.$capturedData) { data in
             guard let data else { return }
             onCompleted(data)
         }

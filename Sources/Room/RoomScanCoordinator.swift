@@ -40,12 +40,11 @@ extension RoomScanCoordinator: RoomCaptureSessionDelegate {
                                     didProvide instruction: RoomCaptureSession.Instruction) {
         let text: String
         switch instruction {
-        case .moveCloseToWall:       text = "Podejdź bliżej ściany"
-        case .moveAwayFromObstacle:  text = "Odsuń się od przeszkody"
-        case .turnOnLight:           text = "Włącz światło"
-        case .lowTexture:            text = "Za mało szczegółów — zmień kąt"
-        case .normal:                text = ""
-        @unknown default:            text = ""
+        case .moveCloseToWall:  text = "Podejdź bliżej ściany"
+        case .turnOnLight:      text = "Włącz światło"
+        case .lowTexture:       text = "Za mało szczegółów — zmień kąt"
+        case .normal:           text = ""
+        @unknown default:       text = ""
         }
         Task { @MainActor in self.instruction = text }
     }
