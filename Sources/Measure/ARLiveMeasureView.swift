@@ -6,6 +6,7 @@ import SceneKit
 
 struct ARLiveMeasureView: View {
     let store: ShotStore
+    let projectName: String
     let onDone: () -> Void
 
     @StateObject private var vm = ARLiveMeasureVM()
