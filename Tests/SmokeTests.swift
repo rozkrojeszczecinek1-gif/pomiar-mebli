@@ -1,5 +1,5 @@
 import XCTest
-@testable import PomiarMebli
+@testable import R2D2PomiarLidar
 
 final class SmokeTests: XCTestCase {
     func testAppModuleLoads() {

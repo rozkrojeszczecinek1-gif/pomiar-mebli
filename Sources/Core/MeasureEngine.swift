@@ -9,6 +9,7 @@ struct DepthSample: Equatable {
 struct MeasurementResult: Equatable {
     var millimeters: Double?
     var reliability: Reliability
+    var perspectiveWarning: Bool
 
     var label: String {
         guard let mm = millimeters else { return "—" }
@@ -56,10 +57,15 @@ enum MeasureEngine {
     static func measure(_ map: DepthMap, _ k: CameraIntrinsics,
                         from a: NormalizedPoint, to b: NormalizedPoint) -> MeasurementResult {
         guard let pa = point3D(map, k, at: a), let pb = point3D(map, k, at: b) else {
-            return MeasurementResult(millimeters: nil, reliability: .red)
+            return MeasurementResult(millimeters: nil, reliability: .red, perspectiveWarning: false)
         }
-        let mm = Double(simd_distance(pa.point, pb.point)) * 1000
-        return MeasurementResult(millimeters: mm, reliability: max(pa.reliability, pb.reliability))
+        let dist = simd_distance(pa.point, pb.point)
+        let mm = Double(dist) * 1000
+        let dz = abs(pa.point.z - pb.point.z)
+        let perspectiveWarning = dist > 0 && (dz / dist) > 0.3
+        return MeasurementResult(millimeters: mm,
+                                 reliability: max(pa.reliability, pb.reliability),
+                                 perspectiveWarning: perspectiveWarning)
     }
 
     // MARK: - helpers

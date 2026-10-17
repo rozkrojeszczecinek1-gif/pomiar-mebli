@@ -1,4 +1,5 @@
 import ARKit
+import AVFoundation
 import CoreImage
 import ImageIO
 import UIKit
@@ -25,6 +26,17 @@ final class CaptureController: ObservableObject {
     func stop() {
         session?.pause()
         UIDevice.current.endGeneratingDeviceOrientationNotifications()
+    }
+
+    func setZoom(_ factor: CGFloat) {
+        guard let device = AVCaptureDevice.default(.builtInLiDARDepthCamera, for: .video, position: .back) else { return }
+        do {
+            try device.lockForConfiguration()
+            let clamped = max(device.minAvailableVideoZoomFactor,
+                              min(factor, device.activeFormat.videoMaxZoomFactor))
+            device.videoZoomFactor = clamped
+            device.unlockForConfiguration()
+        } catch {}
     }
 
     func snap() -> CapturedShot? {

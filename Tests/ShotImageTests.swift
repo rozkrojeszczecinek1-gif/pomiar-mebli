@@ -1,6 +1,6 @@
 import XCTest
 import UIKit
-@testable import PomiarMebli
+@testable import R2D2PomiarLidar
 
 final class ShotImageTests: XCTestCase {
     func testLoadAppliesOrientationAndSwapsDisplayedSize() throws {

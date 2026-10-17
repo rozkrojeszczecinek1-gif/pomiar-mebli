@@ -1,6 +1,6 @@
 import XCTest
 import UIKit
-@testable import PomiarMebli
+@testable import R2D2PomiarLidar
 
 final class OverlayRendererTests: XCTestCase {
     let k = CameraIntrinsics(fx: 1500, fy: 1500, cx: 960, cy: 720, imageWidth: 1920, imageHeight: 1440)

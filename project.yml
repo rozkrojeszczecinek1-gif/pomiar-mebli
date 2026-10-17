@@ -1,4 +1,4 @@
-name: PomiarMebli
+name: R2D2PomiarLidar
 options:
   bundleIdPrefix: pl.rozkroj
   deploymentTarget:
@@ -6,33 +6,33 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.2.0"
+    CURRENT_PROJECT_VERSION: "2"
 targets:
-  PomiarMebli:
+  R2D2PomiarLidar:
     type: application
     platform: iOS
     sources: [Sources]
     info:
       path: Sources/Info.plist
       properties:
-        CFBundleDisplayName: Pomiar mebli
+        CFBundleDisplayName: R2D2_POMIAR_LIDAR
         NSCameraUsageDescription: Aparat służy do robienia zdjęć z pomiarem głębi.
         UILaunchScreen: {}
         UIRequiredDeviceCapabilities: [arkit]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: pl.rozkroj.pomiarmebli
+        PRODUCT_BUNDLE_IDENTIFIER: pl.rozkroj.r2d2pomiarlidar
         TARGETED_DEVICE_FAMILY: "1"
     scheme:
-      testTargets: [PomiarMebliTests]
-  PomiarMebliTests:
+      testTargets: [R2D2PomiarLidarTests]
+  R2D2PomiarLidarTests:
     type: bundle.unit-test
     platform: iOS
     sources: [Tests]
     dependencies:
-      - target: PomiarMebli
+      - target: R2D2PomiarLidar
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

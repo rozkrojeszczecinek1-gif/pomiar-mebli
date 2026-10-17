@@ -1,6 +1,6 @@
 import XCTest
 import CoreVideo
-@testable import PomiarMebli
+@testable import R2D2PomiarLidar
 
 final class DepthExtractionTests: XCTestCase {
     func makeBuffer(width: Int, height: Int, format: OSType) -> CVPixelBuffer {

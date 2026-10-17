@@ -1,6 +1,6 @@
 import XCTest
 import UIKit
-@testable import PomiarMebli
+@testable import R2D2PomiarLidar
 
 final class GeometryTests: XCTestCase {
     func p(_ x: Double, _ y: Double) -> NormalizedPoint { NormalizedPoint(x: x, y: y) }

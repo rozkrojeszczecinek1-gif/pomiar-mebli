@@ -140,6 +140,11 @@ struct MeasureView: View {
                     HStack {
                         Circle().fill(r.reliability.color).frame(width: 10, height: 10)
                         Text(r.label).font(.headline.monospacedDigit())
+                        if r.perspectiveWarning {
+                            Image(systemName: "perspective")
+                                .foregroundStyle(.orange)
+                                .help("Pomiar ukośny — sfotografuj obiekt bardziej na wprost lub użyj zoomu")
+                        }
                         Spacer()
                         Button(role: .destructive) { viewModel.delete(m.id) } label: {
                             Image(systemName: "trash")

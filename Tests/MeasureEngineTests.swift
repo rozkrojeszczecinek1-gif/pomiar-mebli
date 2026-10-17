@@ -1,5 +1,5 @@
 import XCTest
-@testable import PomiarMebli
+@testable import R2D2PomiarLidar
 
 final class MeasureEngineTests: XCTestCase {
     // 1920x1440, f=1500 -> przy głębi 256x192: fx_d = 200, cx_d = 128, cy_d = 96
