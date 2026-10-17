@@ -43,20 +43,18 @@ zadanie 10 oraz końcowy przegląd, zgodnie z executing-plans.”*
 | 7 `MeasureView` + lupa | gotowe, kompiluje się; **nieprzetestowane na telefonie** |
 | 8 Renderer eksportu | gotowe, testy zielone |
 | 9 Galeria i spięcie aplikacji | gotowe, testy zielone |
-| 10 README + test terenowy | **do zrobienia** |
-| Końcowy przegląd całej gałęzi | **do zrobienia** |
+| 10 README + test terenowy | gotowe (README napisany) |
+| Końcowy przegląd całej gałęzi | gotowe (9 bugów naprawionych, commit d227bf5) |
 
-Ostatni zielony przebieg CI: run `38911196591` (commit `b7b66c8`). Artefakt **`PomiarMebli-ipa`**
+Ostatni zielony przebieg CI: run `39021602239` (commit `d227bf5`). Artefakt **`PomiarMebli-ipa`**
 (niepodpisany `.ipa`) można pobrać: `gh run download 38911196591 -n PomiarMebli-ipa`
 (artefakty wygasają po ok. 90 dniach).
 
+Plik IPA pobrany lokalnie: `D:\pomiar-mebli\PomiarMebli.ipa`
+
 ## Co zostało
 
-1. **Zadanie 10** z planu: `README.md` (instalacja przez Sideloadly, użycie, ograniczenia) i
-   lista kontrolna testu terenowego (kopia w planie, Task 10).
-2. **Końcowy przegląd** całej gałęzi `v1` względem specyfikacji i sekcji „Review Focus” planu.
-3. Scalenie `v1` → `main` (po przeglądzie i teście na telefonie).
-4. **Test na iPhonie 14 Pro Max**: instalacja `.ipa` przez Sideloadly (darmowe Apple ID, podpis
+1. **Test na iPhonie 14 Pro Max**: instalacja `.ipa` przez Sideloadly (darmowe Apple ID artur428@wp.pl, podpis
    ważny 7 dni), potem lista z Taska 10. Najważniejsze do sprawdzenia:
    - orientacja: zdjęcie pionowo, poziomo (obie strony) i do góry nogami — punkty muszą wypadać
      w tych samych miejscach obrazu, a eksport wyglądać jak ekran,
