@@ -35,8 +35,8 @@ final class CaptureController: NSObject, ObservableObject {
     }
 
     private static func bestVideoFormat() -> ARWorldTrackingConfiguration.VideoFormat? {
-        ARWorldTrackingConfiguration.supportedVideoFormats
-            .filter { ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) }
+        guard ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) else { return nil }
+        return ARWorldTrackingConfiguration.supportedVideoFormats
             .max {
                 let a = $0.imageResolution; let b = $1.imageResolution
                 return (a.width * a.height) < (b.width * b.height)
