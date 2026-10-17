@@ -7,6 +7,7 @@ struct GalleryView: View {
     let onOpen: (UUID) -> Void
     let onRoomScan: () -> Void
     let onLiveMeasure: () -> Void
+    var onBack: (() -> Void)? = nil
 
     @State private var shots: [ShotMeta] = []
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 12)]
@@ -29,6 +30,16 @@ struct GalleryView: View {
         }
         .navigationTitle(projectName)
         .toolbar {
+            if let back = onBack {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { back() } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                            Text("Projekty")
+                        }
+                    }
+                }
+            }
             ToolbarItem(placement: .topBarLeading) {
                 Menu {
                     Button { onRoomScan() } label: {

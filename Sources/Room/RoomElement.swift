@@ -61,6 +61,8 @@ extension CapturedRoom.Object.Category {
         case .bed:          return "Łóżko"
         case .sink:         return "Zlew/umywalka"
         case .bathtub:      return "Wanna"
+        case .toilet:       return "Toaleta"
+        case .washerDryer:  return "Pralka/suszarka"
         case .oven:         return "Piekarnik"
         case .dishwasher:   return "Zmywarka"
         case .television:   return "TV"

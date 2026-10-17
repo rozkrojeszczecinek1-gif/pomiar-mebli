@@ -23,23 +23,11 @@ struct RootView: View {
                     onNew: { showCapture = true },
                     onOpen: { path.append($0) },
                     onRoomScan: { showRoomScan = true },
-                    onLiveMeasure: { showLiveMeasure = true }
+                    onLiveMeasure: { showLiveMeasure = true },
+                    onBack: { path = []; selectedProject = nil }
                 )
                 .navigationDestination(for: UUID.self) { ShotScreen(store: store, id: $0) }
                 .navigationBarBackButtonHidden(true)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button {
-                            path = []
-                            selectedProject = nil
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "chevron.left")
-                                Text("Projekty")
-                            }
-                        }
-                    }
-                }
             } else {
                 ProjectListView(store: projectStore, onSelect: { project in
                     selectedProject = project
