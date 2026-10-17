@@ -1,9 +1,12 @@
 import SwiftUI
+import RoomPlan
 
 struct RootView: View {
     let store: ShotStore
     @State private var path: [UUID] = []
     @State private var showCapture = false
+    @State private var showRoomScan = false
+    @State private var roomScanData: CapturedRoomData?
 
     init(store: ShotStore = ShotStore(root: ShotStore.defaultRoot())) {
         self.store = store
@@ -11,8 +14,13 @@ struct RootView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            GalleryView(store: store, onNew: { showCapture = true }, onOpen: { path.append($0) })
-                .navigationDestination(for: UUID.self) { ShotScreen(store: store, id: $0) }
+            GalleryView(
+                store: store,
+                onNew: { showCapture = true },
+                onOpen: { path.append($0) },
+                onRoomScan: { showRoomScan = true }
+            )
+            .navigationDestination(for: UUID.self) { ShotScreen(store: store, id: $0) }
         }
         .fullScreenCover(isPresented: $showCapture) {
             CaptureView(onCancel: { showCapture = false }, onCaptured: { shot in
@@ -23,6 +31,19 @@ struct RootView: View {
                     path.append(meta.id)
                 }
             })
+        }
+        .fullScreenCover(isPresented: $showRoomScan) {
+            if let data = roomScanData {
+                RoomResultView(data: data) {
+                    roomScanData = nil
+                    showRoomScan = false
+                }
+            } else {
+                RoomScanView(
+                    onCancel: { showRoomScan = false },
+                    onCompleted: { data in roomScanData = data }
+                )
+            }
         }
     }
 }

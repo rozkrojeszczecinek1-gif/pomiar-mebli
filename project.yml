@@ -21,6 +21,9 @@ targets:
         UILaunchScreen: {}
         UIRequiredDeviceCapabilities: [arkit]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+    dependencies:
+      - sdk: RoomPlan.framework
+      - sdk: ARKit.framework
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: pl.rozkroj.r2d2pomiarlidar

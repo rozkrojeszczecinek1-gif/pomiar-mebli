@@ -4,6 +4,7 @@ struct GalleryView: View {
     let store: ShotStore
     let onNew: () -> Void
     let onOpen: (UUID) -> Void
+    let onRoomScan: () -> Void
 
     @State private var shots: [ShotMeta] = []
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 12)]
@@ -24,8 +25,13 @@ struct GalleryView: View {
                 }
             }.padding()
         }
-        .navigationTitle("Pomiar mebli")
+        .navigationTitle("R2D2 Pomiar")
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button(action: onRoomScan) {
+                    Label("Skanuj pokój", systemImage: "cube.transparent")
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button(action: onNew) { Image(systemName: "plus.circle.fill") }
             }
