@@ -1,5 +1,4 @@
 import ARKit
-import AVFoundation
 import CoreImage
 import ImageIO
 import UIKit
@@ -49,19 +48,6 @@ final class CaptureController: NSObject, ObservableObject {
 
     func setZoom(_ factor: CGFloat) {
         currentZoom = factor
-        applyZoom(factor)
-    }
-
-    private func applyZoom(_ factor: CGFloat) {
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else { return }
-        let maxF = min(device.activeFormat.videoMaxZoomFactor, 5.0)
-        let clamped = min(max(factor, device.minAvailableVideoZoomFactor), maxF)
-        if (try? device.lockForConfiguration()) != nil {
-            device.videoZoomFactor = clamped
-            device.unlockForConfiguration()
-        } else {
-            device.videoZoomFactor = clamped
-        }
     }
 
     func snap(zoom: CGFloat = 1.0) -> CapturedShot? {
@@ -142,11 +128,4 @@ final class CaptureController: NSObject, ObservableObject {
     }
 }
 
-extension CaptureController: ARSessionDelegate {
-    nonisolated func session(_ session: ARSession, didUpdate frame: ARFrame) {
-        Task { @MainActor [weak self] in
-            guard let self, self.currentZoom > 1.01 else { return }
-            self.applyZoom(self.currentZoom)
-        }
-    }
-}
+extension CaptureController: ARSessionDelegate {}

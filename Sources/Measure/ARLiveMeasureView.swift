@@ -123,19 +123,30 @@ final class ARLiveMeasureVM: NSObject, ObservableObject {
     func handleTap(at screenPoint: CGPoint) {
         guard let view = scnView else { return }
 
-        // Priority order: plane geometry → plane raycast → estimated plane → feature point
-        let hits = view.hitTest(screenPoint, types: [
-            .existingPlaneUsingGeometry,
-            .estimatedVerticalPlane,
-            .estimatedHorizontalPlane,
-            .featurePoint
-        ])
-        guard let hit = hits.first else {
-            hint = "Nie znaleziono powierzchni — przesuń powoli"; return
-        }
+        // Modern raycasting (iOS 13+): works at any point the LiDAR can see,
+        // not just where ARKit has explicitly detected a plane anchor.
+        let worldPt: SCNVector3? = {
+            // 1. raycast against existing plane anchors (most accurate)
+            if let q = view.raycastQuery(from: screenPoint,
+                                         allowing: .existingPlaneGeometry, alignment: .any),
+               let r = view.session.raycast(q).first {
+                let c = r.worldTransform.columns.3
+                return SCNVector3(c.x, c.y, c.z)
+            }
+            // 2. estimated plane (works everywhere the LiDAR depth fills in)
+            if let q = view.raycastQuery(from: screenPoint,
+                                         allowing: .estimatedPlane, alignment: .any),
+               let r = view.session.raycast(q).first {
+                let c = r.worldTransform.columns.3
+                return SCNVector3(c.x, c.y, c.z)
+            }
+            return nil
+        }()
 
-        let col = hit.worldTransform.columns.3
-        let pt = SCNVector3(col.x, col.y, col.z)
+        guard let pt = worldPt else {
+            hint = "Nie znaleziono powierzchni — przesuń powoli i spróbuj ponownie"
+            return
+        }
 
         if pointA == nil {
             placeA(pt, scene: view.scene)
