@@ -7,10 +7,9 @@ import UIKit
 @MainActor
 final class CaptureController: NSObject, ObservableObject {
     private var session: ARSession?
-    // Use 16-bit wide color CIContext for maximum colour fidelity
     private let ciContext = CIContext(options: [.workingColorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!,
                                                 .outputColorSpace:  CGColorSpace(name: CGColorSpace.displayP3)!])
-    private var currentZoom: CGFloat = 1.0
+    private(set) var currentZoom: CGFloat = 1.0
 
     nonisolated static var isSupported: Bool {
         ARWorldTrackingConfiguration.isSupported
@@ -24,7 +23,6 @@ final class CaptureController: NSObject, ObservableObject {
         UIDevice.current.beginGeneratingDeviceOrientationNotifications()
 
         let config = ARWorldTrackingConfiguration()
-        // Pick highest-resolution format available (4K on iPhone 14 Pro Max)
         config.videoFormat = Self.bestVideoFormat() ?? config.videoFormat
         config.frameSemantics = [.sceneDepth, .smoothedSceneDepth]
         config.planeDetection = [.horizontal, .vertical]
@@ -58,7 +56,6 @@ final class CaptureController: NSObject, ObservableObject {
         guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else { return }
         let maxF = min(device.activeFormat.videoMaxZoomFactor, 5.0)
         let clamped = min(max(factor, device.minAvailableVideoZoomFactor), maxF)
-        // ARKit holds the config lock while running; try lock first, fall back to direct set
         if (try? device.lockForConfiguration()) != nil {
             device.videoZoomFactor = clamped
             device.unlockForConfiguration()
@@ -67,22 +64,24 @@ final class CaptureController: NSObject, ObservableObject {
         }
     }
 
-    func snap() -> CapturedShot? {
+    func snap(zoom: CGFloat = 1.0) -> CapturedShot? {
         guard let frame = session?.currentFrame,
               let sceneDepth = frame.smoothedSceneDepth ?? frame.sceneDepth,
               let confidence = sceneDepth.confidenceMap,
-              let depth = DepthExtraction.depthMap(depth: sceneDepth.depthMap, confidence: confidence)
+              let rawDepth = DepthExtraction.depthMap(depth: sceneDepth.depthMap, confidence: confidence)
         else { return nil }
 
-        let ci = CIImage(cvPixelBuffer: frame.capturedImage)
+        let rawCI = CIImage(cvPixelBuffer: frame.capturedImage)
 
-        // Prefer HEIF 16-bit (P3 wide colour) — closest to ProRAW we can get from ARKit
-        // ARKit gives YCbCr CVPixelBuffer; true ProRAW sensor data is not available from ARKit API
-        let imageData: Data?
+        // Crop center of image and depth map to match the visual zoom shown to user
+        let ci = zoom > 1.01 ? cropCI(rawCI, zoom: zoom) : rawCI
+        let depth = zoom > 1.01 ? cropDepth(rawDepth, zoom: zoom) : rawDepth
+
         let p3 = CGColorSpace(name: CGColorSpace.displayP3)!
+        let imageData: Data?
         if #available(iOS 15, *) {
             imageData = ciContext.heifRepresentation(of: ci,
-                                                     format: .RGBAh,   // 16-bit half-precision
+                                                     format: .RGBAh,
                                                      colorSpace: p3,
                                                      options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 1.0])
         } else {
@@ -93,17 +92,58 @@ final class CaptureController: NSObject, ObservableObject {
 
         let k = frame.camera.intrinsics
         let res = frame.camera.imageResolution
-        let intrinsics = CameraIntrinsics(fx: Double(k[0][0]), fy: Double(k[1][1]),
-                                          cx: Double(k[2][0]), cy: Double(k[2][1]),
-                                          imageWidth: Int(res.width), imageHeight: Int(res.height))
+        let rawIntrinsics = CameraIntrinsics(fx: Double(k[0][0]), fy: Double(k[1][1]),
+                                             cx: Double(k[2][0]), cy: Double(k[2][1]),
+                                             imageWidth: Int(res.width), imageHeight: Int(res.height))
+        let intrinsics = zoom > 1.01 ? cropIntrinsics(rawIntrinsics, zoom: zoom) : rawIntrinsics
         let orientation = SensorGeometry.imageOrientation(for: UIDevice.current.orientation)
         return CapturedShot(jpeg: data, depth: depth, intrinsics: intrinsics, orientation: orientation)
+    }
+
+    // MARK: - Zoom crop helpers
+
+    private func cropCI(_ ci: CIImage, zoom: CGFloat) -> CIImage {
+        let w = ci.extent.width / zoom
+        let h = ci.extent.height / zoom
+        let x = (ci.extent.width - w) / 2
+        let y = (ci.extent.height - h) / 2
+        return ci.cropped(to: CGRect(x: x, y: y, width: w, height: h))
+            .transformed(by: CGAffineTransform(translationX: -x, y: -y))
+    }
+
+    private func cropDepth(_ map: DepthMap, zoom: CGFloat) -> DepthMap {
+        let newW = max(1, Int(Double(map.width) / Double(zoom)))
+        let newH = max(1, Int(Double(map.height) / Double(zoom)))
+        let x0 = (map.width - newW) / 2
+        let y0 = (map.height - newH) / 2
+        var d = [Float](repeating: 0, count: newW * newH)
+        var c = [UInt8](repeating: 0, count: newW * newH)
+        for y in 0..<newH {
+            for x in 0..<newW {
+                let src = (y0 + y) * map.width + (x0 + x)
+                let dst = y * newW + x
+                d[dst] = map.depth[src]
+                c[dst] = map.confidence[src]
+            }
+        }
+        return DepthMap(width: newW, height: newH, depth: d, confidence: c)
+    }
+
+    // Adjust intrinsics for a center crop at the given zoom factor.
+    // fx/fy stay unchanged (same physical pixel size); cx/cy shift toward center.
+    private func cropIntrinsics(_ k: CameraIntrinsics, zoom: CGFloat) -> CameraIntrinsics {
+        let newW = Double(k.imageWidth) / Double(zoom)
+        let newH = Double(k.imageHeight) / Double(zoom)
+        let offsetX = (Double(k.imageWidth) - newW) / 2
+        let offsetY = (Double(k.imageHeight) - newH) / 2
+        return CameraIntrinsics(fx: k.fx, fy: k.fy,
+                                cx: k.cx - offsetX, cy: k.cy - offsetY,
+                                imageWidth: Int(newW), imageHeight: Int(newH))
     }
 }
 
 extension CaptureController: ARSessionDelegate {
     nonisolated func session(_ session: ARSession, didUpdate frame: ARFrame) {
-        // Re-apply zoom every frame — ARKit resets videoZoomFactor when reconfiguring the session
         Task { @MainActor [weak self] in
             guard let self, self.currentZoom > 1.01 else { return }
             self.applyZoom(self.currentZoom)

@@ -36,7 +36,15 @@ enum MeasureEngine {
             let solid = share >= 0.6 && agree >= 0.8
             return DepthSample(depth: med, reliability: (inRange && solid) ? .green : .yellow)
         }
-        // Fallback: accept medium-confidence depth (ARKit returns medium on glass, dark/shiny surfaces)
+        // Phase 2: accept medium-confidence in the same small window (glass, dark, shiny surfaces)
+        let smallMed = window(map, cx, cy, radius: 2, minConf: 1)
+        if smallMed.total > 0, Double(smallMed.values.count) / Double(smallMed.total) >= 0.4 {
+            let med = median(smallMed.values)
+            if med >= minRange && med <= maxRange {
+                return DepthSample(depth: med, reliability: .yellow)
+            }
+        }
+        // Phase 3: wider fallback window with medium confidence
         let large = window(map, cx, cy, radius: 3, minConf: 1)
         if large.values.isEmpty { return DepthSample(depth: nil, reliability: .red) }
         return DepthSample(depth: median(large.values), reliability: .yellow)

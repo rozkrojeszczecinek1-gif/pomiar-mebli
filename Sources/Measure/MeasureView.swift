@@ -30,8 +30,13 @@ struct MeasureView: View {
                     Canvas { ctx, _ in draw(ctx, layout) }
                         .allowsHitTesting(false)
                     if let t = touch, layout.rect.width > 0 {
+                        let loupeOffset: CGFloat = 130
+                        let loupeX = min(max(t.x, 70), geo.size.width - 70)
+                        let loupeY = t.y > loupeOffset
+                            ? t.y - loupeOffset
+                            : min(t.y + loupeOffset, geo.size.height - 70)
                         LoupeView(image: image, imageSize: layout.rect.size, center: layout.displayPoint(t))
-                            .position(x: min(max(t.x, 70), geo.size.width - 70), y: max(t.y - 100, 70))
+                            .position(x: loupeX, y: loupeY)
                             .allowsHitTesting(false)
                     }
                 }

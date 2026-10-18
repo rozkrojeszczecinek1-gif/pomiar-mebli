@@ -13,7 +13,9 @@ struct CaptureView: View {
     var body: some View {
         ZStack {
             if CaptureController.isSupported {
-                ARCameraView(controller: controller).ignoresSafeArea()
+                ARCameraView(controller: controller)
+                    .scaleEffect(zoomFactor)
+                    .ignoresSafeArea()
                 VStack {
                     HStack {
                         Button("Anuluj", action: onCancel)
@@ -57,7 +59,7 @@ struct CaptureView: View {
     }
 
     private func shoot() {
-        if let shot = controller.snap() {
+        if let shot = controller.snap(zoom: zoomFactor) {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             controller.stop()
             onCaptured(shot)
