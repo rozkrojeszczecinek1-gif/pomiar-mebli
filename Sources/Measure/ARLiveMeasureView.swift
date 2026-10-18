@@ -15,6 +15,30 @@ struct ARLiveMeasureView: View {
         ZStack {
             ARMeasureSceneView(vm: vm).ignoresSafeArea()
 
+            // Crosshair + live depth at screen center
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    ZStack {
+                        Circle().strokeBorder(.white.opacity(0.9), lineWidth: 1.5).frame(width: 44, height: 44)
+                        Rectangle().fill(.white.opacity(0.9)).frame(width: 20, height: 1.5)
+                        Rectangle().fill(.white.opacity(0.9)).frame(width: 1.5, height: 20)
+                        if !vm.liveDepthLabel.isEmpty {
+                            Text(vm.liveDepthLabel)
+                                .font(.system(size: 11, weight: .medium).monospacedDigit())
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 5).padding(.vertical, 2)
+                                .background(.black.opacity(0.5), in: Capsule())
+                                .offset(y: 30)
+                        }
+                    }
+                    Spacer()
+                }
+                Spacer()
+            }
+            .allowsHitTesting(false)
+
             VStack {
                 HStack {
                     Button("Zamknij") { onDone() }
@@ -115,44 +139,68 @@ final class ARLiveMeasureVM: NSObject, ObservableObject {
     @Published var hint = "Skieruj na powierzchnię i dotknij punkt A"
     @Published var trackingLabel = "Inicjalizacja…"
     @Published var trackingColor = Color.orange
+    @Published var liveDepthLabel = ""
 
     var pointA: SCNVector3?
     private var nodeA: SCNNode?
     weak var scnView: ARSCNView?
 
     func handleTap(at screenPoint: CGPoint) {
-        guard let view = scnView else { return }
+        guard let view = scnView,
+              let frame = view.session.currentFrame,
+              let sceneDepth = frame.smoothedSceneDepth ?? frame.sceneDepth else {
+            hint = "Brak danych głębi — poczekaj chwilę"
+            return
+        }
+        let vs = view.bounds.size
+        guard vs.width > 0, vs.height > 0 else { return }
 
-        // Modern raycasting (iOS 13+): works at any point the LiDAR can see,
-        // not just where ARKit has explicitly detected a plane anchor.
-        let worldPt: SCNVector3? = {
-            // 1. raycast against existing plane anchors (most accurate)
-            if let q = view.raycastQuery(from: screenPoint,
-                                         allowing: .existingPlaneGeometry, alignment: .any),
-               let r = view.session.raycast(q).first {
-                let c = r.worldTransform.columns.3
-                return SCNVector3(c.x, c.y, c.z)
-            }
-            // 2. estimated plane (works everywhere the LiDAR depth fills in)
-            if let q = view.raycastQuery(from: screenPoint,
-                                         allowing: .estimatedPlane, alignment: .any),
-               let r = view.session.raycast(q).first {
-                let c = r.worldTransform.columns.3
-                return SCNVector3(c.x, c.y, c.z)
-            }
-            return nil
-        }()
+        // Portrait screen → landscape sensor (toSensor .right: nx=sy/H, ny=1-sx/W)
+        let nx = screenPoint.y / vs.height
+        let ny = 1.0 - screenPoint.x / vs.width
 
-        guard let pt = worldPt else {
-            hint = "Nie znaleziono powierzchni — przesuń powoli i spróbuj ponownie"
+        // Sample LiDAR depth (Float32 CVPixelBuffer, landscape 256×192)
+        let pb = sceneDepth.depthMap
+        let dW = CVPixelBufferGetWidth(pb), dH = CVPixelBufferGetHeight(pb)
+        let dCol = min(max(Int(nx * Double(dW)), 0), dW - 1)
+        let dRow = min(max(Int(ny * Double(dH)), 0), dH - 1)
+        CVPixelBufferLockBaseAddress(pb, .readOnly)
+        let base = CVPixelBufferGetBaseAddress(pb)!.assumingMemoryBound(to: Float32.self)
+        let stride = CVPixelBufferGetBytesPerRow(pb) / 4
+        let z = Double(base[dRow * stride + dCol])
+        CVPixelBufferUnlockBaseAddress(pb, .readOnly)
+
+        guard z.isFinite, z > 0.15, z < 8.0 else {
+            hint = "Nie można zmierzyć tutaj — skieruj na bliższą powierzchnię"
             return
         }
 
-        if pointA == nil {
-            placeA(pt, scene: view.scene)
-        } else {
-            placeB(pt, scene: view.scene)
-        }
+        // Back-project to world space using camera intrinsics + transform
+        let k = frame.camera.intrinsics
+        let res = frame.camera.imageResolution
+        let imgCol = nx * Double(res.width)
+        let imgRow = ny * Double(res.height)
+        let xCV = (imgCol - Double(k[2][0])) / Double(k[0][0]) * z
+        let yCV = (imgRow - Double(k[2][1])) / Double(k[1][1]) * z
+        // Image: Y down, Z forward → ARKit camera: Y up, Z toward viewer (negative)
+        let camPos = SIMD4<Float>(Float(xCV), Float(-yCV), Float(-z), 1)
+        let worldPos = frame.camera.transform * camPos
+        let pt = SCNVector3(worldPos.x, worldPos.y, worldPos.z)
+
+        if pointA == nil { placeA(pt, scene: view.scene) }
+        else             { placeB(pt, scene: view.scene) }
+    }
+
+    func updateLiveDepth(frame: ARFrame) {
+        guard let sd = frame.smoothedSceneDepth ?? frame.sceneDepth else { liveDepthLabel = ""; return }
+        let pb = sd.depthMap
+        let dW = CVPixelBufferGetWidth(pb), dH = CVPixelBufferGetHeight(pb)
+        CVPixelBufferLockBaseAddress(pb, .readOnly)
+        let base = CVPixelBufferGetBaseAddress(pb)!.assumingMemoryBound(to: Float32.self)
+        let stride = CVPixelBufferGetBytesPerRow(pb) / 4
+        let z = Double(base[(dH / 2) * stride + dW / 2])
+        CVPixelBufferUnlockBaseAddress(pb, .readOnly)
+        liveDepthLabel = z.isFinite && z > 0 ? String(format: "%.2f m", z) : ""
     }
 
     private func placeA(_ pt: SCNVector3, scene: SCNScene) {
@@ -309,7 +357,10 @@ private struct ARMeasureSceneView: UIViewRepresentable {
         }
 
         nonisolated func session(_ session: ARSession, didUpdate frame: ARFrame) {
-            Task { @MainActor in self.vm.updateTracking(state: frame.camera.trackingState) }
+            Task { @MainActor in
+                self.vm.updateTracking(state: frame.camera.trackingState)
+                self.vm.updateLiveDepth(frame: frame)
+            }
         }
     }
 }

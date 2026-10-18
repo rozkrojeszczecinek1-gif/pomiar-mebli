@@ -4,11 +4,13 @@ struct Measurement: Codable, Identifiable, Equatable {
     var id: UUID
     var a: NormalizedPoint
     var b: NormalizedPoint
+    var manualMM: Double?
 
-    init(id: UUID = UUID(), a: NormalizedPoint, b: NormalizedPoint) {
+    init(id: UUID = UUID(), a: NormalizedPoint, b: NormalizedPoint, manualMM: Double? = nil) {
         self.id = id
         self.a = a
         self.b = b
+        self.manualMM = manualMM
     }
 }
 
@@ -21,6 +23,7 @@ struct ShotMeta: Codable, Identifiable, Equatable {
     var depthHeight: Int
     var orientation: ImageOrientation
     var measurements: [Measurement]
+    var calibrationFactor: Double?
 }
 
 struct CapturedShot {
