@@ -29,7 +29,7 @@ struct CaptureView: View {
                     }
                     HStack(spacing: 8) {
                         Image(systemName: "minus.magnifyingglass").foregroundStyle(.white)
-                        Slider(value: $zoomFactor, in: 0.5...5.0)
+                        Slider(value: $zoomFactor, in: 1.0...5.0)
                             .onChange(of: zoomFactor) { _, v in controller.setZoom(v) }
                         Image(systemName: "plus.magnifyingglass").foregroundStyle(.white)
                         Text(String(format: "%.1f×", zoomFactor))
