@@ -36,7 +36,8 @@ enum MeasureEngine {
             let solid = share >= 0.6 && agree >= 0.8
             return DepthSample(depth: med, reliability: (inRange && solid) ? .green : .yellow)
         }
-        let large = window(map, cx, cy, radius: 3)
+        // Fallback: accept medium-confidence depth (ARKit returns medium on glass, dark/shiny surfaces)
+        let large = window(map, cx, cy, radius: 3, minConf: 1)
         if large.values.isEmpty { return DepthSample(depth: nil, reliability: .red) }
         return DepthSample(depth: median(large.values), reliability: .yellow)
     }
@@ -72,7 +73,8 @@ enum MeasureEngine {
 
     private static func clamp(_ i: Int, _ n: Int) -> Int { min(max(i, 0), n - 1) }
 
-    private static func window(_ m: DepthMap, _ cx: Int, _ cy: Int, radius r: Int)
+    private static func window(_ m: DepthMap, _ cx: Int, _ cy: Int, radius r: Int,
+                               minConf: UInt8 = highConfidence)
         -> (values: [Float], total: Int) {
         guard m.width > 0, m.height > 0 else { return ([], 0) }
         var out: [Float] = []
@@ -82,7 +84,7 @@ enum MeasureEngine {
                 total += 1
                 let i = y * m.width + x
                 let d = m.depth[i]
-                if m.confidence[i] == highConfidence, d.isFinite, d > 0 { out.append(d) }
+                if m.confidence[i] >= minConf, d.isFinite, d > 0 { out.append(d) }
             }
         }
         return (out, total)

@@ -1,6 +1,7 @@
 import SwiftUI
 import RoomPlan
 import SceneKit
+import QuickLook
 import simd
 
 struct RoomResultView: View {
@@ -66,17 +67,10 @@ struct RoomResultView: View {
     private var scene3D: some View {
         ZStack(alignment: .bottom) {
             if let url = usdzURL {
-                USDZSceneView(usdzURL: url, elements: elements, selected: selected) { el in
-                    withAnimation(.spring(response: 0.3)) {
-                        selected = (selected?.id == el?.id) ? nil : el
-                    }
-                }
-                .ignoresSafeArea(edges: .bottom)
+                QuickLookUSDZView(url: url)
+                    .ignoresSafeArea(edges: .bottom)
             }
-            VStack(spacing: 0) {
-                legend
-                if let s = selected { selectionCard(s) }
-            }
+            legend
         }
     }
 
@@ -177,7 +171,32 @@ struct RoomResultView: View {
     }
 }
 
-// MARK: - USDZ + element overlay in SCNView
+// MARK: - QuickLook USDZ viewer (proper PBR rendering + AR placement)
+
+private struct QuickLookUSDZView: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> QLPreviewController {
+        let c = QLPreviewController()
+        c.dataSource = context.coordinator
+        return c
+    }
+
+    func updateUIViewController(_ uiViewController: QLPreviewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(url: url) }
+
+    final class Coordinator: NSObject, QLPreviewControllerDataSource {
+        let url: URL
+        init(url: URL) { self.url = url }
+        func numberOfPreviewItems(in controller: QLPreviewController) -> Int { 1 }
+        func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
+            url as QLPreviewItem
+        }
+    }
+}
+
+// MARK: - USDZ + element overlay in SCNView (kept for fallback reference)
 
 private struct USDZSceneView: UIViewRepresentable {
     let usdzURL: URL

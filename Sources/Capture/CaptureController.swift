@@ -56,10 +56,15 @@ final class CaptureController: NSObject, ObservableObject {
 
     private func applyZoom(_ factor: CGFloat) {
         guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else { return }
-        do { try device.lockForConfiguration() } catch { return }
-        defer { device.unlockForConfiguration() }
         let maxF = min(device.activeFormat.videoMaxZoomFactor, 5.0)
-        device.videoZoomFactor = min(max(factor, device.minAvailableVideoZoomFactor), maxF)
+        let clamped = min(max(factor, device.minAvailableVideoZoomFactor), maxF)
+        // ARKit holds the config lock while running; try lock first, fall back to direct set
+        if (try? device.lockForConfiguration()) != nil {
+            device.videoZoomFactor = clamped
+            device.unlockForConfiguration()
+        } else {
+            device.videoZoomFactor = clamped
+        }
     }
 
     func snap() -> CapturedShot? {
@@ -98,9 +103,10 @@ final class CaptureController: NSObject, ObservableObject {
 
 extension CaptureController: ARSessionDelegate {
     nonisolated func session(_ session: ARSession, didUpdate frame: ARFrame) {
-        guard frame.timestamp.truncatingRemainder(dividingBy: 0.5) < 0.017 else { return }
-        Task { @MainActor in
-            if self.currentZoom > 1.01 { self.applyZoom(self.currentZoom) }
+        // Re-apply zoom every frame — ARKit resets videoZoomFactor when reconfiguring the session
+        Task { @MainActor [weak self] in
+            guard let self, self.currentZoom > 1.01 else { return }
+            self.applyZoom(self.currentZoom)
         }
     }
 }
