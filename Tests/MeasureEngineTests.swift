@@ -95,4 +95,57 @@ final class MeasureEngineTests: XCTestCase {
         XCTAssertNil(r.millimeters)           // lewy punkt bez ważnych pikseli
         XCTAssertEqual(r.reliability, .red)
     }
+
+    // MARK: - medium confidence fallback (powierzchnie szklane, czarne, błyszczące)
+
+    func testMediumConfidenceFallbackGivesYellowResult() {
+        // Wszystkie piksele medium (1) — małe okno wymaga high(2), wiec fallback do dużego z minConf=1
+        let m = DepthMap.uniform(width: 256, height: 192, depth: 2.0, confidence: 1)
+        let s = MeasureEngine.sample(m, at: p(0.5, 0.5))
+        XCTAssertNotNil(s.depth)
+        XCTAssertEqual(s.depth!, 2.0, accuracy: 0.001)
+        XCTAssertEqual(s.reliability, .yellow)
+    }
+
+    func testMediumConfidenceAllowsFullMeasurement() {
+        let m = DepthMap.uniform(width: 256, height: 192, depth: 2.0, confidence: 1)
+        let r = MeasureEngine.measure(m, k, from: p(0.25, 0.5), to: p(0.75, 0.5))
+        XCTAssertNotNil(r.millimeters)
+        XCTAssertEqual(r.millimeters!, 1280, accuracy: 1.0)
+        XCTAssertEqual(r.reliability, .yellow)
+    }
+
+    func testLowConfidenceZeroStillRed() {
+        // confidence=0 (low) — powinno nadal dawać red nawet po zmianie progu fallbacku
+        let m = DepthMap.uniform(width: 256, height: 192, depth: 2.0, confidence: 0)
+        let s = MeasureEngine.sample(m, at: p(0.5, 0.5))
+        XCTAssertNil(s.depth)
+        XCTAssertEqual(s.reliability, .red)
+    }
+
+    func testMixedMediumAndHighConfidenceGivesGreenWhenEnoughHighPixels() {
+        // 50% high + 50% medium w oknie 5x5 -> high dominuje -> green
+        var m = DepthMap.uniform(width: 256, height: 192, depth: 2.0, confidence: 1)
+        let cx = 128, cy = 96
+        for dy in -2...2 { for dx in 0...2 {
+            m.confidence[(cy + dy) * 256 + (cx + dx)] = 2
+        } }
+        let s = MeasureEngine.sample(m, at: p(0.5, 0.5))
+        XCTAssertNotNil(s.depth)
+        XCTAssertEqual(s.depth!, 2.0, accuracy: 0.001)
+    }
+
+    func testPerspectiveWarningWhenDepthsDiffer() {
+        // Dwa punkty na różnych głębokościach (kąt widzenia)
+        var m = plane(1.0)
+        for i in 0..<(192 * 256) where (i % 256) >= 128 { m.depth[i] = 2.0 }
+        let r = MeasureEngine.measure(m, k, from: p(0.1, 0.5), to: p(0.9, 0.5))
+        XCTAssertNotNil(r.millimeters)
+        XCTAssertTrue(r.perspectiveWarning)
+    }
+
+    func testNoPerspectiveWarningForFlatSurface() {
+        let r = MeasureEngine.measure(plane(1.5), k, from: p(0.2, 0.5), to: p(0.8, 0.5))
+        XCTAssertFalse(r.perspectiveWarning)
+    }
 }
