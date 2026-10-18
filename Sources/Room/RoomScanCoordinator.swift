@@ -12,6 +12,7 @@ final class RoomScanCoordinator: NSObject, ObservableObject {
 
     func start() {
         guard let captureView else { return }
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
         captureView.captureSession.delegate = self
         let config = RoomCaptureSession.Configuration()
         captureView.captureSession.run(configuration: config)
@@ -20,6 +21,7 @@ final class RoomScanCoordinator: NSObject, ObservableObject {
 
     func stop() {
         captureView?.captureSession.stop(pauseARSession: false)
+        UIDevice.current.endGeneratingDeviceOrientationNotifications()
         isScanning = false
     }
 }
@@ -40,11 +42,13 @@ extension RoomScanCoordinator: RoomCaptureSessionDelegate {
                                     didProvide instruction: RoomCaptureSession.Instruction) {
         let text: String
         switch instruction {
-        case .moveCloseToWall:  text = "Podejdź bliżej ściany"
-        case .turnOnLight:      text = "Włącz światło"
-        case .lowTexture:       text = "Za mało szczegółów — zmień kąt"
-        case .normal:           text = ""
-        @unknown default:       text = ""
+        case .moveCloseToWall:   text = "Podejdź bliżej ściany"
+        case .moveAwayFromWall:  text = "Odsuń się od ściany"
+        case .slowDown:          text = "Zwolnij — poruszaj się wolniej"
+        case .turnOnLight:       text = "Włącz światło"
+        case .lowTexture:        text = "Za mało szczegółów — zmień kąt"
+        case .normal:            text = ""
+        @unknown default:        text = ""
         }
         Task { @MainActor in self.instruction = text }
     }

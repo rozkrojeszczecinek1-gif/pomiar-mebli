@@ -67,7 +67,8 @@ private struct RoomCaptureRepresentable: UIViewRepresentable {
     let coordinator: RoomScanCoordinator
 
     func makeUIView(context: Context) -> RoomCaptureView {
-        let view = RoomCaptureView(frame: .zero)
+        let view = RoomCaptureView(frame: UIScreen.main.bounds)
+        view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         coordinator.captureView = view
         coordinator.start()
         return view
