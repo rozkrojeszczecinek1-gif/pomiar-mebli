@@ -7,8 +7,10 @@ struct RootView: View {
     @State private var path: [UUID] = []
     @State private var showCapture = false
     @State private var showRoomScan = false
+    @State private var showMeshScan = false
     @State private var showLiveMeasure = false
     @State private var roomScanData: CapturedRoomData?
+    @State private var meshScanData: ColoredMeshData?
 
     private var shotStore: ShotStore? {
         selectedProject.map { projectStore.shotStore(for: $0) }
@@ -23,6 +25,7 @@ struct RootView: View {
                     onNew: { showCapture = true },
                     onOpen: { path.append($0) },
                     onRoomScan: { showRoomScan = true },
+                    onMeshScan: { showMeshScan = true },
                     onLiveMeasure: { showLiveMeasure = true },
                     onBack: { path = []; selectedProject = nil }
                 )
@@ -57,6 +60,19 @@ struct RootView: View {
                 RoomScanView(
                     onCancel: { showRoomScan = false },
                     onCompleted: { data in roomScanData = data }
+                )
+            }
+        }
+        .fullScreenCover(isPresented: $showMeshScan) {
+            if let data = meshScanData {
+                MeshResultView(data: data) {
+                    meshScanData = nil
+                    showMeshScan = false
+                }
+            } else {
+                MeshScanView(
+                    onCancel: { showMeshScan = false },
+                    onCompleted: { data in meshScanData = data }
                 )
             }
         }

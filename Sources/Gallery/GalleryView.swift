@@ -6,6 +6,7 @@ struct GalleryView: View {
     let onNew: () -> Void
     let onOpen: (UUID) -> Void
     let onRoomScan: () -> Void
+    let onMeshScan: () -> Void
     let onLiveMeasure: () -> Void
     var onBack: (() -> Void)? = nil
 
@@ -42,8 +43,11 @@ struct GalleryView: View {
             }
             ToolbarItem(placement: .topBarLeading) {
                 Menu {
+                    Button { onMeshScan() } label: {
+                        Label("Skan 3D Foto (LiDAR)", systemImage: "camera.metering.matrix")
+                    }
                     Button { onRoomScan() } label: {
-                        Label("Skanuj pokój 3D", systemImage: "cube.transparent")
+                        Label("Skan 3D RoomPlan", systemImage: "cube.transparent")
                     }
                     Button { onLiveMeasure() } label: {
                         Label("AR Pomiar na żywo", systemImage: "ruler")

@@ -12,6 +12,8 @@ struct MeasureView: View {
     @State private var isManualMode = false
     @State private var pendingManualSheet: ManualPoint? = nil
     @State private var manualInput = ""
+    @State private var editingMeasurement: Measurement? = nil
+    @State private var editManualInput = ""
 
     private var orientation: ImageOrientation { viewModel.meta.orientation }
     private let hitRadius: CGFloat = 28
@@ -116,6 +118,50 @@ struct MeasureView: View {
             }
             .presentationDetents([.height(260)])
         }
+        .sheet(item: $editingMeasurement) { m in
+            NavigationStack {
+                VStack(spacing: 20) {
+                    Text("Edytuj wymiar")
+                        .font(.headline)
+                    TextField("np. 850", text: $editManualInput)
+                        .keyboardType(.decimalPad)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.title2)
+                        .padding(.horizontal)
+                    Text("milimetry (mm)")
+                        .font(.caption).foregroundStyle(.secondary)
+                    if m.manualMM != nil {
+                        Button("Usuń wymiar ręczny — wróć do LiDAR") {
+                            viewModel.setManual(nil, for: m.id)
+                            editingMeasurement = nil
+                        }
+                        .font(.footnote).foregroundStyle(.red)
+                    }
+                }
+                .padding()
+                .navigationTitle("Edycja pomiaru")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Anuluj") { editingMeasurement = nil }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Zapisz") {
+                            let raw = editManualInput.replacingOccurrences(of: ",", with: ".")
+                            if let mm = Double(raw), mm > 0 {
+                                viewModel.setManual(mm, for: m.id)
+                            }
+                            editingMeasurement = nil
+                        }
+                        .disabled({
+                            let raw = editManualInput.replacingOccurrences(of: ",", with: ".")
+                            return Double(raw) == nil || Double(raw)! <= 0
+                        }())
+                    }
+                }
+            }
+            .presentationDetents([.height(320)])
+        }
     }
 
     // MARK: gesty
@@ -218,6 +264,14 @@ struct MeasureView: View {
                                 .help("Pomiar ukośny — sfotografuj obiekt bardziej na wprost lub użyj zoomu")
                         }
                         Spacer()
+                        Button {
+                            editManualInput = m.manualMM.map { String(format: "%.0f", $0) } ?? ""
+                            editingMeasurement = m
+                        } label: {
+                            Image(systemName: "pencil")
+                        }
+                        .buttonStyle(.borderless)
+                        .tint(.orange)
                         Button(role: .destructive) { viewModel.delete(m.id) } label: {
                             Image(systemName: "trash")
                         }.buttonStyle(.borderless)
