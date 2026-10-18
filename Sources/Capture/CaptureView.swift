@@ -1,6 +1,7 @@
 import SwiftUI
 import ARKit
 import RealityKit
+import PhotosUI
 
 struct CaptureView: View {
     let onCancel: () -> Void
@@ -9,6 +10,7 @@ struct CaptureView: View {
     @StateObject private var controller = CaptureController()
     @State private var failed = false
     @State private var zoomFactor: CGFloat = 1.0
+    @State private var selectedPhoto: PhotosPickerItem? = nil
 
     var body: some View {
         ZStack {
@@ -35,17 +37,33 @@ struct CaptureView: View {
                         Text(String(format: "%.1f×", zoomFactor))
                             .font(.caption.monospacedDigit()).foregroundStyle(.white).frame(width: 36)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 20).padding(.vertical, 8)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal)
-                    Button(action: shoot) {
-                        Circle().strokeBorder(.white, lineWidth: 4)
-                            .background(Circle().fill(.white.opacity(0.85)).padding(6))
-                            .frame(width: 76, height: 76)
+
+                    HStack(spacing: 20) {
+                        // Gallery picker
+                        PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                            Image(systemName: "photo.on.rectangle")
+                                .font(.title2)
+                                .frame(width: 56, height: 56)
+                                .background(.ultraThinMaterial, in: Circle())
+                        }
+                        .onChange(of: selectedPhoto) { _, item in
+                            Task { await importGalleryPhoto(item) }
+                        }
+
+                        // Shutter
+                        Button(action: shoot) {
+                            Circle().strokeBorder(.white, lineWidth: 4)
+                                .background(Circle().fill(.white.opacity(0.85)).padding(6))
+                                .frame(width: 76, height: 76)
+                        }
+
+                        // Spacer for balance
+                        Color.clear.frame(width: 56, height: 56)
                     }
-                    .padding(.bottom, 28)
-                    .padding(.top, 8)
+                    .padding(.bottom, 28).padding(.top, 8)
                 }
             } else {
                 VStack(spacing: 16) {
@@ -66,6 +84,31 @@ struct CaptureView: View {
         } else {
             failed = true
         }
+    }
+
+    @MainActor
+    private func importGalleryPhoto(_ item: PhotosPickerItem?) async {
+        guard let item,
+              let data = try? await item.loadTransferable(type: Data.self),
+              let raw = UIImage(data: data) else { return }
+
+        // Normalise orientation and scale to max 2048px
+        let maxSide: CGFloat = 2048
+        let scale = min(maxSide / max(raw.size.width, raw.size.height), 1.0)
+        let sz = CGSize(width: raw.size.width * scale, height: raw.size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: sz)
+        let img = renderer.image { _ in raw.draw(in: CGRect(origin: .zero, size: sz)) }
+        guard let jpeg = img.jpegData(compressionQuality: 0.92) else { return }
+
+        let w = Int(sz.width), h = Int(sz.height)
+        // Uniform depth 0 → measurements will show red, user knows to use manual mode
+        let depth = DepthMap.uniform(width: 32, height: 24, depth: 0, confidence: 0)
+        let fx = Double(max(w, h)) * 0.88
+        let intrinsics = CameraIntrinsics(fx: fx, fy: fx, cx: Double(w) / 2, cy: Double(h) / 2,
+                                          imageWidth: w, imageHeight: h)
+        let shot = CapturedShot(jpeg: jpeg, depth: depth, intrinsics: intrinsics, orientation: .up)
+        controller.stop()
+        onCaptured(shot)
     }
 }
 

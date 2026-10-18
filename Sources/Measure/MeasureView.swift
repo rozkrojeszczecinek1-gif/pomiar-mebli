@@ -2,7 +2,7 @@ import SwiftUI
 
 struct MeasureView: View {
     @ObservedObject var viewModel: MeasureViewModel
-    let image: UIImage            // obrócony do orientacji wyświetlania
+    let image: UIImage
     let onShare: () -> Void
 
     private enum Drag { case move(DragTarget), place }
@@ -14,6 +14,11 @@ struct MeasureView: View {
     @State private var manualInput = ""
     @State private var editingMeasurement: Measurement? = nil
     @State private var editManualInput = ""
+    @State private var editNameInput = ""
+
+    // Zoom state
+    @State private var photoZoom: CGFloat = 1.0
+    @GestureState private var pinchScale: CGFloat = 1.0
 
     private var orientation: ImageOrientation { viewModel.meta.orientation }
     private let hitRadius: CGFloat = 28
@@ -34,28 +39,73 @@ struct MeasureView: View {
         VStack(spacing: 0) {
             GeometryReader { geo in
                 let layout = ImageLayout(container: geo.size, displayed: image.size)
-                ZStack(alignment: .topLeading) {
-                    Image(uiImage: image).resizable().scaledToFit()
-                        .frame(width: geo.size.width, height: geo.size.height)
-                    Canvas { ctx, _ in draw(ctx, layout) }
-                        .allowsHitTesting(false)
-                    if let t = touch, layout.rect.width > 0 {
+                ZStack {
+                    // Zoomable content
+                    ZStack(alignment: .topLeading) {
+                        Image(uiImage: image).resizable().scaledToFit()
+                            .frame(width: geo.size.width, height: geo.size.height)
+                        Canvas { ctx, _ in draw(ctx, layout) }
+                            .allowsHitTesting(false)
+                    }
+                    .scaleEffect(photoZoom * pinchScale)
+                    .clipped()
+                    .contentShape(Rectangle())
+                    .gesture(
+                        SimultaneousGesture(
+                            MagnificationGesture()
+                                .updating($pinchScale) { v, s, _ in s = v }
+                                .onEnded { v in
+                                    photoZoom = min(max(photoZoom * v, 1.0), 8.0)
+                                },
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { g in
+                                    guard abs(pinchScale - 1.0) < 0.05 else { return }
+                                    touch = g.location
+                                    onChanged(content(g.location, geo.size), layout)
+                                }
+                                .onEnded { g in
+                                    guard abs(pinchScale - 1.0) < 0.05 else {
+                                        touch = nil; drag = nil; return
+                                    }
+                                    onEnded(content(g.location, geo.size), layout)
+                                }
+                        )
+                    )
+                    .onTapGesture(count: 2) {
+                        withAnimation(.spring(response: 0.3)) { photoZoom = 1.0 }
+                    }
+
+                    // Loupe — outside scaled ZStack so it stays same size
+                    if let t = touch, layout.rect.width > 0, photoZoom * pinchScale < 2.5 {
+                        let tc = content(t, geo.size)
                         let loupeOffset: CGFloat = 130
                         let loupeX = min(max(t.x, 70), geo.size.width - 70)
                         let loupeY = t.y > loupeOffset
                             ? t.y - loupeOffset
                             : min(t.y + loupeOffset, geo.size.height - 70)
-                        LoupeView(image: image, imageSize: layout.rect.size, center: layout.displayPoint(t))
+                        LoupeView(image: image, imageSize: layout.rect.size, center: layout.displayPoint(tc))
                             .position(x: loupeX, y: loupeY)
                             .allowsHitTesting(false)
                     }
+
+                    // Zoom hint
+                    if photoZoom > 1.05 {
+                        VStack {
+                            HStack {
+                                Spacer()
+                                Button {
+                                    withAnimation(.spring(response: 0.3)) { photoZoom = 1.0 }
+                                } label: {
+                                    Label(String(format: "%.1f×", photoZoom * pinchScale), systemImage: "arrow.up.left.and.arrow.down.right")
+                                        .font(.caption)
+                                        .padding(6).background(.ultraThinMaterial, in: Capsule())
+                                }
+                                .padding(8)
+                            }
+                            Spacer()
+                        }
+                    }
                 }
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { g in onChanged(g.location, layout) }
-                        .onEnded { g in onEnded(g.location, layout) }
-                )
             }
             list
         }
@@ -63,9 +113,7 @@ struct MeasureView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    isManualMode.toggle()
-                } label: {
+                Button { isManualMode.toggle() } label: {
                     Label(isManualMode ? "Ręczny" : "Auto",
                           systemImage: isManualMode ? "pencil.circle.fill" : "sensor.tag.radiowaves.forward")
                         .font(.caption)
@@ -100,10 +148,7 @@ struct MeasureView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Anuluj") {
-                            viewModel.cancelPending()
-                            pendingManualSheet = nil
-                        }
+                        Button("Anuluj") { viewModel.cancelPending(); pendingManualSheet = nil }
                     }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Zapisz") {
@@ -120,25 +165,22 @@ struct MeasureView: View {
         }
         .sheet(item: $editingMeasurement) { m in
             NavigationStack {
-                VStack(spacing: 20) {
-                    Text("Edytuj wymiar")
-                        .font(.headline)
-                    TextField("np. 850", text: $editManualInput)
-                        .keyboardType(.decimalPad)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.title2)
-                        .padding(.horizontal)
-                    Text("milimetry (mm)")
-                        .font(.caption).foregroundStyle(.secondary)
-                    if m.manualMM != nil {
-                        Button("Usuń wymiar ręczny — wróć do LiDAR") {
-                            viewModel.setManual(nil, for: m.id)
-                            editingMeasurement = nil
+                Form {
+                    Section("Nazwa (opcjonalnie)") {
+                        TextField("np. Szerokość szafy", text: $editNameInput)
+                    }
+                    Section("Wartość (mm)") {
+                        TextField("np. 850", text: $editManualInput)
+                            .keyboardType(.decimalPad)
+                        if m.manualMM != nil {
+                            Button("Usuń wartość ręczną — wróć do LiDAR") {
+                                viewModel.setManual(nil, for: m.id)
+                                editingMeasurement = nil
+                            }
+                            .foregroundStyle(.red)
                         }
-                        .font(.footnote).foregroundStyle(.red)
                     }
                 }
-                .padding()
                 .navigationTitle("Edycja pomiaru")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -147,24 +189,28 @@ struct MeasureView: View {
                     }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Zapisz") {
+                            viewModel.setName(editNameInput, for: m.id)
                             let raw = editManualInput.replacingOccurrences(of: ",", with: ".")
-                            if let mm = Double(raw), mm > 0 {
-                                viewModel.setManual(mm, for: m.id)
-                            }
+                            if let mm = Double(raw), mm > 0 { viewModel.setManual(mm, for: m.id) }
                             editingMeasurement = nil
                         }
-                        .disabled({
-                            let raw = editManualInput.replacingOccurrences(of: ",", with: ".")
-                            return Double(raw) == nil || Double(raw)! <= 0
-                        }())
                     }
                 }
             }
-            .presentationDetents([.height(320)])
+            .presentationDetents([.medium])
         }
     }
 
-    // MARK: gesty
+    // MARK: - Zoom helper
+
+    private func content(_ p: CGPoint, _ size: CGSize) -> CGPoint {
+        let z = photoZoom * pinchScale
+        guard z > 0.01 else { return p }
+        let cx = size.width / 2, cy = size.height / 2
+        return CGPoint(x: (p.x - cx) / z + cx, y: (p.y - cy) / z + cy)
+    }
+
+    // MARK: - Gestures
 
     private func project(_ layout: ImageLayout) -> (NormalizedPoint) -> CGPoint {
         { sensor in layout.viewPoint(SensorGeometry.toDisplay(sensor, orientation)) }
@@ -175,7 +221,6 @@ struct MeasureView: View {
     }
 
     private func onChanged(_ loc: CGPoint, _ layout: ImageLayout) {
-        touch = loc
         if drag == nil {
             if let t = viewModel.hit(at: loc, radius: hitRadius, project: project(layout)) {
                 drag = .move(t)
@@ -204,7 +249,7 @@ struct MeasureView: View {
         touch = nil
     }
 
-    // MARK: rysowanie
+    // MARK: - Canvas
 
     private func draw(_ ctx: GraphicsContext, _ layout: ImageLayout) {
         let proj = project(layout)
@@ -221,12 +266,13 @@ struct MeasureView: View {
                 ctx.stroke(dot, with: .color(.white), lineWidth: 1.5)
             }
             let mid = CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2)
-            let labelText = r.label + (isManual ? " ✎" : "")
-            let text = ctx.resolve(Text(labelText).font(.system(size: 14, weight: .bold)).foregroundColor(.black))
-            let size = text.measure(in: CGSize(width: 200, height: 40))
+            let valueStr = r.label + (isManual ? " ✎" : "")
+            let labelText = m.name.map { "\($0): \(valueStr)" } ?? valueStr
+            let text = ctx.resolve(Text(labelText).font(.system(size: 13, weight: .bold)).foregroundColor(.black))
+            let size = text.measure(in: CGSize(width: 260, height: 40))
             let box = CGRect(x: mid.x - size.width / 2 - 6, y: mid.y - size.height / 2 - 3,
                              width: size.width + 12, height: size.height + 6)
-            ctx.fill(Path(roundedRect: box, cornerRadius: 6), with: .color(.white.opacity(0.9)))
+            ctx.fill(Path(roundedRect: box, cornerRadius: 6), with: .color(.white.opacity(0.92)))
             ctx.draw(text, at: mid)
         }
         if let a = viewModel.pendingA {
@@ -236,7 +282,7 @@ struct MeasureView: View {
         }
     }
 
-    // MARK: lista
+    // MARK: - List
 
     private var list: some View {
         List {
@@ -248,30 +294,35 @@ struct MeasureView: View {
                 if viewModel.meta.measurements.isEmpty {
                     Text(viewModel.pendingA == nil
                          ? (isManualMode
-                            ? "Tryb ręczny: zaznacz punkt A, potem B — wpiszesz odległość."
-                            : "Przyłóż palec, przeciągnij lupą na punkt i puść — to punkt A. Potem tak samo punkt B.")
+                            ? "Tryb ręczny: zaznacz A, potem B — wpiszesz odległość."
+                            : "Przytknij palec, lupą celuj w punkt i puść — punkt A. Potem B.")
                          : "Teraz wskaż punkt B.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 ForEach(viewModel.meta.measurements) { m in
                     let r = viewModel.result(for: m)
                     HStack {
-                        Circle().fill(m.manualMM != nil ? Color.orange : r.reliability.color).frame(width: 10, height: 10)
-                        Text(r.label + (m.manualMM != nil ? " ✎" : "")).font(.headline.monospacedDigit())
+                        Circle().fill(m.manualMM != nil ? Color.orange : r.reliability.color)
+                            .frame(width: 10, height: 10)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(r.label + (m.manualMM != nil ? " ✎" : ""))
+                                .font(.headline.monospacedDigit())
+                            if let n = m.name {
+                                Text(n).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
                         if r.perspectiveWarning {
-                            Image(systemName: "perspective")
-                                .foregroundStyle(.orange)
-                                .help("Pomiar ukośny — sfotografuj obiekt bardziej na wprost lub użyj zoomu")
+                            Image(systemName: "perspective").foregroundStyle(.orange)
                         }
                         Spacer()
                         Button {
                             editManualInput = m.manualMM.map { String(format: "%.0f", $0) } ?? ""
+                            editNameInput = m.name ?? ""
                             editingMeasurement = m
                         } label: {
                             Image(systemName: "pencil")
                         }
-                        .buttonStyle(.borderless)
-                        .tint(.orange)
+                        .buttonStyle(.borderless).tint(.orange)
                         Button(role: .destructive) { viewModel.delete(m.id) } label: {
                             Image(systemName: "trash")
                         }.buttonStyle(.borderless)
@@ -279,6 +330,6 @@ struct MeasureView: View {
                 }
             }
         }
-        .frame(maxHeight: 260)
+        .frame(maxHeight: 280)
     }
 }

@@ -5,12 +5,10 @@ struct Measurement: Codable, Identifiable, Equatable {
     var a: NormalizedPoint
     var b: NormalizedPoint
     var manualMM: Double?
+    var name: String?
 
-    init(id: UUID = UUID(), a: NormalizedPoint, b: NormalizedPoint, manualMM: Double? = nil) {
-        self.id = id
-        self.a = a
-        self.b = b
-        self.manualMM = manualMM
+    init(id: UUID = UUID(), a: NormalizedPoint, b: NormalizedPoint, manualMM: Double? = nil, name: String? = nil) {
+        self.id = id; self.a = a; self.b = b; self.manualMM = manualMM; self.name = name
     }
 }
 
