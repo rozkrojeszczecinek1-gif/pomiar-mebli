@@ -23,7 +23,6 @@ struct ShotMeta: Codable, Identifiable, Equatable {
     var depthHeight: Int
     var orientation: ImageOrientation
     var measurements: [Measurement]
-    var calibrationFactor: Double?
 }
 
 struct CapturedShot {

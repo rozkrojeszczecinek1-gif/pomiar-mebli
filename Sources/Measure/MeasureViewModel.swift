@@ -27,12 +27,7 @@ final class MeasureViewModel: ObservableObject {
             return MeasurementResult(millimeters: mm, reliability: .green, perspectiveWarning: false)
         }
         if let cached = resultsCache[m.id] { return cached }
-        var r = MeasureEngine.measure(depth, meta.intrinsics, from: m.a, to: m.b)
-        if let factor = meta.calibrationFactor, let mm = r.millimeters {
-            r = MeasurementResult(millimeters: mm * factor,
-                                  reliability: r.reliability,
-                                  perspectiveWarning: r.perspectiveWarning)
-        }
+        let r = MeasureEngine.measure(depth, meta.intrinsics, from: m.a, to: m.b)
         resultsCache[m.id] = r
         return r
     }
@@ -87,15 +82,6 @@ final class MeasureViewModel: ObservableObject {
         guard let i = meta.measurements.firstIndex(where: { $0.id == id }) else { return }
         meta.measurements[i].manualMM = mm
         resultsCache.removeValue(forKey: id)
-        persist()
-    }
-
-    func calibrate(lidarID id: UUID, actualMM: Double) {
-        guard let m = meta.measurements.first(where: { $0.id == id }) else { return }
-        let r = MeasureEngine.measure(depth, meta.intrinsics, from: m.a, to: m.b)
-        guard let lidar = r.millimeters, lidar > 0 else { return }
-        meta.calibrationFactor = actualMM / lidar
-        resultsCache.removeAll()
         persist()
     }
 
