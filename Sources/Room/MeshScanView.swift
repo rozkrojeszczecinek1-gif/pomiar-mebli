@@ -90,8 +90,6 @@ private struct MeshARSceneView: UIViewRepresentable {
         let view = ARSCNView(frame: .zero)
         view.session.delegate = context.coordinator
         view.automaticallyUpdatesLighting = true
-        // Wireframe overlay shows the mesh being built in real time
-        view.debugOptions = [.showSceneUnderstanding]
         coordinator.start(view)
         return view
     }
