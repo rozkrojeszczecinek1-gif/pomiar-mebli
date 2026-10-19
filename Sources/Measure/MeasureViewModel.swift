@@ -78,6 +78,12 @@ final class MeasureViewModel: ObservableObject {
         persist()
     }
 
+    func addBatch(_ batch: [Measurement]) {
+        guard !batch.isEmpty else { return }
+        meta.measurements.append(contentsOf: batch)
+        persist()
+    }
+
     func setName(_ name: String?, for id: UUID) {
         guard let i = meta.measurements.firstIndex(where: { $0.id == id }) else { return }
         meta.measurements[i].name = name.flatMap { $0.isEmpty ? nil : $0 }

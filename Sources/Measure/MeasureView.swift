@@ -1,4 +1,5 @@
 import SwiftUI
+import Vision
 
 struct MeasureView: View {
     @ObservedObject var viewModel: MeasureViewModel
@@ -10,6 +11,8 @@ struct MeasureView: View {
     @State private var touch: CGPoint?
     @State private var name: String
     @State private var isManualMode = false
+    @State private var isDetecting = false
+    @State private var detectError: String? = nil
     @State private var pendingManualSheet: ManualPoint? = nil
     @State private var manualInput = ""
     @State private var editingMeasurement: Measurement? = nil
@@ -121,10 +124,26 @@ struct MeasureView: View {
                 .tint(isManualMode ? .orange : .blue)
             }
             ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task { await detectEdges() }
+                } label: {
+                    if isDetecting {
+                        ProgressView().scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "sparkle.magnifyingglass")
+                    }
+                }
+                .disabled(isDetecting)
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 Button { onShare() } label: { Image(systemName: "square.and.arrow.up") }
                     .disabled(viewModel.meta.measurements.isEmpty)
             }
         }
+        .alert("Brak detekcji", isPresented: Binding(get: { detectError != nil },
+                                                    set: { if !$0 { detectError = nil } })) {
+            Button("OK") { detectError = nil }
+        } message: { Text(detectError ?? "") }
         .alert("Nie można zapisać pomiarów", isPresented: $viewModel.saveError) {
             Button("OK") { viewModel.saveError = false }
         } message: {
@@ -199,6 +218,44 @@ struct MeasureView: View {
             }
             .presentationDetents([.medium])
         }
+    }
+
+    // MARK: - AI edge detection
+
+    @MainActor
+    private func detectEdges() async {
+        guard let cg = image.cgImage else { return }
+        isDetecting = true
+        defer { isDetecting = false }
+
+        let request = VNDetectRectanglesRequest()
+        request.minimumConfidence = 0.4
+        request.minimumSize = 0.08
+        request.maximumObservations = 10
+
+        // Vision zwraca punkty w układzie obrazu po uwzględnieniu orientacji UIImage,
+        // czyli w tym samym układzie co wyświetlane zdjęcie (origin lewy-dolny).
+        let handler = VNImageRequestHandler(cgImage: cg,
+                                            orientation: CGImagePropertyOrientation(image.imageOrientation),
+                                            options: [:])
+        guard (try? handler.perform([request])) != nil,
+              let results = request.results,
+              !results.isEmpty else {
+            detectError = "Nie wykryto prostokątów w tym zdjęciu."
+            return
+        }
+
+        let orient = orientation
+        func toSensor(_ pt: CGPoint) -> NormalizedPoint {
+            SensorGeometry.toSensor(NormalizedPoint(x: Double(pt.x), y: Double(1 - pt.y)), orient)
+        }
+        var batch: [Measurement] = []
+        for obs in results {
+            let tl = toSensor(obs.topLeft), tr = toSensor(obs.topRight), br = toSensor(obs.bottomRight)
+            batch.append(Measurement(a: tl, b: tr, name: "Szerokość"))
+            batch.append(Measurement(a: tr, b: br, name: "Wysokość"))
+        }
+        viewModel.addBatch(batch)
     }
 
     // MARK: - Zoom helper
@@ -331,5 +388,21 @@ struct MeasureView: View {
             }
         }
         .frame(maxHeight: 280)
+    }
+}
+
+private extension CGImagePropertyOrientation {
+    init(_ o: UIImage.Orientation) {
+        switch o {
+        case .up: self = .up
+        case .down: self = .down
+        case .left: self = .left
+        case .right: self = .right
+        case .upMirrored: self = .upMirrored
+        case .downMirrored: self = .downMirrored
+        case .leftMirrored: self = .leftMirrored
+        case .rightMirrored: self = .rightMirrored
+        @unknown default: self = .up
+        }
     }
 }
